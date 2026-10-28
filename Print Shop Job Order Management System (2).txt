@@ -1,0 +1,691 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Printer, 
+  Plus, 
+  Search, 
+  Clock, 
+  CheckCircle2, 
+  DollarSign, 
+  User, 
+  Phone, 
+  FileText, 
+  Calendar, 
+  Trash2, 
+  Edit3, 
+  Eye, 
+  Printer as PrintIcon, 
+  ArrowRight, 
+  X,
+  Sparkles,
+  PackageCheck,
+  Package,
+  AlertCircle
+} from 'lucide-react';
+
+// Simplified Sample Orders
+const INITIAL_JOBS = [
+  {
+    id: "JOB-101",
+    customerName: "John Smith",
+    phone: "555-0123",
+    jobTitle: "500 Business Cards (350gsm Soft Touch)",
+    totalPrice: 85,
+    depositPaid: 40,
+    dueDate: new Date(Date.now() + 5 * 3600 * 1000).toISOString(), // Due in 5 hrs
+    status: "In Progress", // "In Progress" | "Ready" | "Completed"
+    notes: "Red foil on logo. Customer will pick up in person."
+  },
+  {
+    id: "JOB-102",
+    customerName: "Maria Garcia",
+    phone: "555-0188",
+    jobTitle: "2x Outdoor Vinyl Banner (6x3 ft with grommets)",
+    totalPrice: 140,
+    depositPaid: 140,
+    dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    status: "Ready",
+    notes: "Paid in full. Stored on Shelf B."
+  },
+  {
+    id: "JOB-103",
+    customerName: "David Lee",
+    phone: "555-0199",
+    jobTitle: "100 Tri-fold Brochures (Gloss Paper)",
+    totalPrice: 95,
+    depositPaid: 50,
+    dueDate: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), // Slightly overdue
+    status: "In Progress",
+    notes: "High priority for event tomorrow morning."
+  },
+  {
+    id: "JOB-104",
+    customerName: "Sarah Connor",
+    phone: "555-0144",
+    jobTitle: "Acrylic Office Door Signboard",
+    totalPrice: 120,
+    depositPaid: 120,
+    dueDate: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+    status: "Completed",
+    notes: "Picked up on Tuesday."
+  }
+];
+
+export default function App() {
+  const [jobs, setJobs] = useState(() => {
+    const saved = localStorage.getItem('simple_print_jobs');
+    return saved ? JSON.parse(saved) : INITIAL_JOBS;
+  });
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState(null);
+  const [ticketJob, setTicketJob] = useState(null);
+
+  // Auto-save to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('simple_print_jobs', JSON.stringify(jobs));
+  }, [jobs]);
+
+  // Filter jobs based on search
+  const filteredJobs = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return jobs;
+    return jobs.filter(j => 
+      j.id.toLowerCase().includes(q) ||
+      j.customerName.toLowerCase().includes(q) ||
+      j.phone.includes(q) ||
+      j.jobTitle.toLowerCase().includes(q)
+    );
+  }, [jobs, searchQuery]);
+
+  // Handle create or edit job
+  const handleSaveJob = (jobData) => {
+    if (editingJob) {
+      setJobs(prev => prev.map(j => j.id === editingJob.id ? { ...jobData, id: editingJob.id } : j));
+    } else {
+      const newJob = {
+        ...jobData,
+        id: `JOB-${Math.floor(100 + Math.random() * 900)}`,
+        orderDate: new Date().toISOString()
+      };
+      setJobs(prev => [newJob, ...prev]);
+    }
+    setIsFormOpen(false);
+    setEditingJob(null);
+  };
+
+  // Move job stage simply
+  const handleMoveStage = (jobId, newStatus) => {
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: newStatus } : j));
+  };
+
+  // Delete Job
+  const handleDeleteJob = (id) => {
+    if (window.confirm("Delete this job order permanently?")) {
+      setJobs(prev => prev.filter(j => j.id !== id));
+    }
+  };
+
+  // Compute time indicator string
+  const getTimeInfo = (dueDateStr, status) => {
+    if (status === 'Completed') return { text: 'Done', badgeClass: 'bg-emerald-100 text-emerald-800' };
+
+    const due = new Date(dueDateStr);
+    const now = new Date();
+    const diffMs = due - now;
+
+    if (diffMs < 0) {
+      const hours = Math.abs(Math.floor(diffMs / (1000 * 60 * 60)));
+      return { 
+        text: hours > 24 ? `${Math.floor(hours / 24)}d Overdue` : `${hours}h Overdue`, 
+        badgeClass: 'bg-rose-100 text-rose-700 font-bold animate-pulse' 
+      };
+    } else {
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      return { 
+        text: hours > 24 ? `Due in ${Math.floor(hours / 24)} day(s)` : `Due in ${hours} hour(s)`, 
+        badgeClass: hours < 4 ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-700' 
+      };
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-12 selection:bg-amber-200">
+      
+      {/* HEADER BAR */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          
+          <div className="flex items-center space-x-3">
+            <div className="bg-amber-500 text-slate-950 p-2.5 rounded-2xl shadow-md">
+              <Printer className="w-7 h-7 stroke-[2.5]" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                Print Shop Orders
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">Simple & Easy Order Tracker</p>
+            </div>
+          </div>
+
+          {/* New Order Button */}
+          <button
+            onClick={() => {
+              setEditingJob(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-5 py-3 rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-95 transition"
+          >
+            <Plus className="w-6 h-6 stroke-[3]" />
+            <span>+ New Job Order</span>
+          </button>
+
+        </div>
+      </header>
+
+      {/* SEARCH BAR */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+        <div className="relative">
+          <Search className="w-6 h-6 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by customer name, phone, or job title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border-2 border-slate-200 focus:border-amber-500 rounded-2xl pl-12 pr-10 py-3.5 text-base font-medium shadow-sm outline-none transition placeholder-slate-400"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* MAIN 3-COLUMN WORKFLOW */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* COLUMN 1: IN PROGRESS */}
+          <ColumnSection 
+            title="🟡 In Progress" 
+            subtitle="Designing, Printing & Finishing"
+            bgColor="bg-amber-50/60"
+            borderColor="border-amber-200"
+            badgeBg="bg-amber-200 text-amber-900"
+            jobs={filteredJobs.filter(j => j.status === 'In Progress')}
+            onMoveStage={handleMoveStage}
+            onEdit={(j) => { setEditingJob(j); setIsFormOpen(true); }}
+            onDelete={handleDeleteJob}
+            onTicket={setTicketJob}
+            getTimeInfo={getTimeInfo}
+          />
+
+          {/* COLUMN 2: READY FOR PICKUP */}
+          <ColumnSection 
+            title="🔵 Ready for Pickup" 
+            subtitle="Finished & Waiting for Customer"
+            bgColor="bg-blue-50/60"
+            borderColor="border-blue-200"
+            badgeBg="bg-blue-200 text-blue-900"
+            jobs={filteredJobs.filter(j => j.status === 'Ready')}
+            onMoveStage={handleMoveStage}
+            onEdit={(j) => { setEditingJob(j); setIsFormOpen(true); }}
+            onDelete={handleDeleteJob}
+            onTicket={setTicketJob}
+            getTimeInfo={getTimeInfo}
+          />
+
+          {/* COLUMN 3: COMPLETED */}
+          <ColumnSection 
+            title="🟢 Completed / Picked Up" 
+            subtitle="Job Done & Handed Over"
+            bgColor="bg-emerald-50/60"
+            borderColor="border-emerald-200"
+            badgeBg="bg-emerald-200 text-emerald-900"
+            jobs={filteredJobs.filter(j => j.status === 'Completed')}
+            onMoveStage={handleMoveStage}
+            onEdit={(j) => { setEditingJob(j); setIsFormOpen(true); }}
+            onDelete={handleDeleteJob}
+            onTicket={setTicketJob}
+            getTimeInfo={getTimeInfo}
+          />
+
+        </div>
+      </main>
+
+      {/* EASY NEW/EDIT JOB MODAL */}
+      {isFormOpen && (
+        <EasyJobModal 
+          isOpen={isFormOpen} 
+          onClose={() => { setIsFormOpen(false); setEditingJob(null); }}
+          onSave={handleSaveJob}
+          initialData={editingJob}
+        />
+      )}
+
+      {/* PRINTABLE JOB TICKET MODAL */}
+      {ticketJob && (
+        <TicketModal 
+          job={ticketJob}
+          onClose={() => setTicketJob(null)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+// ============================================
+// COLUMN COMPONENT
+// ============================================
+function ColumnSection({ title, subtitle, bgColor, borderColor, badgeBg, jobs, onMoveStage, onEdit, onDelete, onTicket, getTimeInfo }) {
+  return (
+    <div className={`rounded-3xl border-2 ${borderColor} ${bgColor} p-4 flex flex-col min-h-[600px]`}>
+      
+      {/* Column Header */}
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/80">
+        <div>
+          <h2 className="font-extrabold text-lg text-slate-900">{title}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
+        <span className={`px-3 py-1 rounded-full font-black text-xs ${badgeBg}`}>
+          {jobs.length}
+        </span>
+      </div>
+
+      {/* Cards List */}
+      <div className="space-y-4 flex-1">
+        {jobs.length === 0 ? (
+          <div className="text-center py-12 text-slate-400 font-medium text-sm">
+            No orders here right now.
+          </div>
+        ) : (
+          jobs.map(job => {
+            const balance = job.totalPrice - job.depositPaid;
+            const timeData = getTimeInfo(job.dueDate, job.status);
+
+            return (
+              <div 
+                key={job.id} 
+                className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 hover:shadow-md transition flex flex-col justify-between"
+              >
+                <div>
+                  {/* Top Header: ID & Time Indicator */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono font-bold text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
+                      {job.id}
+                    </span>
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${timeData.badgeClass}`}>
+                      {timeData.text}
+                    </span>
+                  </div>
+
+                  {/* Customer Info */}
+                  <h3 className="font-extrabold text-base text-slate-900 leading-tight">
+                    {job.customerName}
+                  </h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" /> {job.phone}
+                  </p>
+
+                  {/* Job Description */}
+                  <div className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <p className="text-sm font-bold text-slate-800 leading-snug">
+                      {job.jobTitle}
+                    </p>
+                    {job.notes && (
+                      <p className="text-xs text-slate-500 mt-1 italic">
+                        "{job.notes}"
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Financials callout */}
+                  <div className="mt-3 flex items-center justify-between text-xs font-semibold bg-amber-50/50 p-2 rounded-lg border border-amber-100">
+                    <span className="text-slate-600">Total: ${job.totalPrice}</span>
+                    <span className={balance > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}>
+                      {balance > 0 ? `Unpaid Bal: $${balance}` : '✓ Fully Paid'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions Bar */}
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                  
+                  {/* Main Progression Button */}
+                  {job.status === 'In Progress' && (
+                    <button
+                      onClick={() => onMoveStage(job.id, 'Ready')}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+                    >
+                      <span>Mark as READY FOR PICKUP</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {job.status === 'Ready' && (
+                    <button
+                      onClick={() => onMoveStage(job.id, 'Completed')}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Mark as COMPLETED / PICKED UP</span>
+                    </button>
+                  )}
+
+                  {job.status === 'Completed' && (
+                    <button
+                      onClick={() => onMoveStage(job.id, 'In Progress')}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-1.5 rounded-xl text-xs transition"
+                    >
+                      Move back to In Progress
+                    </button>
+                  )}
+
+                  {/* Secondary Quick Action Buttons */}
+                  <div className="flex items-center justify-between pt-1 text-slate-500">
+                    <button
+                      onClick={() => onTicket(job)}
+                      className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-amber-600 px-2 py-1 rounded hover:bg-slate-100"
+                    >
+                      <PrintIcon className="w-3.5 h-3.5" />
+                      <span>Print Ticket</span>
+                    </button>
+
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => onEdit(job)}
+                        className="p-1 hover:text-blue-600 hover:bg-slate-100 rounded"
+                        title="Edit Order"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onDelete(job.id)}
+                        className="p-1 hover:text-rose-600 hover:bg-slate-100 rounded"
+                        title="Delete Order"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            );
+          })
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+// ============================================
+// SIMPLE & EASY FORM MODAL
+// ============================================
+function EasyJobModal({ isOpen, onClose, onSave, initialData }) {
+  const [customerName, setCustomerName] = useState(initialData?.customerName || '');
+  const [phone, setPhone] = useState(initialData?.phone || '');
+  const [jobTitle, setJobTitle] = useState(initialData?.jobTitle || '');
+  const [totalPrice, setTotalPrice] = useState(initialData?.totalPrice || '');
+  const [depositPaid, setDepositPaid] = useState(initialData?.depositPaid || '');
+  const [dueDate, setDueDate] = useState(
+    initialData?.dueDate 
+      ? new Date(initialData.dueDate).toISOString().slice(0, 16) 
+      : new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16)
+  );
+  const [notes, setNotes] = useState(initialData?.notes || '');
+  const [status, setStatus] = useState(initialData?.status || 'In Progress');
+
+  const totalNum = parseFloat(totalPrice) || 0;
+  const depositNum = parseFloat(depositPaid) || 0;
+  const balanceDue = Math.max(0, totalNum - depositNum);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({
+      customerName,
+      phone,
+      jobTitle,
+      totalPrice: totalNum,
+      depositPaid: depositNum,
+      dueDate: new Date(dueDate).toISOString(),
+      notes,
+      status
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden my-8">
+        
+        {/* Header */}
+        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Printer className="w-6 h-6 text-amber-400" />
+            <h2 className="text-lg font-black">
+              {initialData ? 'Edit Order Details' : 'Create New Job Order'}
+            </h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          
+          {/* Customer Name & Phone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">Customer Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Sarah Jenkins"
+                value={customerName}
+                onChange={e => setCustomerName(e.target.value)}
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:border-amber-500 focus:bg-white outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">Phone Number *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. 555-0192"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:border-amber-500 focus:bg-white outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Job Description */}
+          <div>
+            <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">Job Description *</label>
+            <textarea
+              required
+              rows="2"
+              placeholder="e.g. 500 Business Cards (300gsm Matte, Double Sided)"
+              value={jobTitle}
+              onChange={e => setJobTitle(e.target.value)}
+              className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium focus:border-amber-500 focus:bg-white outline-none resize-none"
+            />
+          </div>
+
+          {/* Pricing & Deposit */}
+          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Total ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="0"
+                value={totalPrice}
+                onChange={e => setTotalPrice(e.target.value)}
+                className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-extrabold text-slate-900 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Deposit ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={depositPaid}
+                onChange={e => setDepositPaid(e.target.value)}
+                className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-extrabold text-emerald-700 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Balance Due</label>
+              <div className="bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-rose-600">
+                ${balanceDue.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          {/* Due Date & Time */}
+          <div>
+            <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">Due Date & Time *</label>
+            <input
+              type="datetime-local"
+              required
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:border-amber-500 focus:bg-white outline-none"
+            />
+          </div>
+
+          {/* Optional Notes */}
+          <div>
+            <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">Notes (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Special color code, shelf location..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium focus:border-amber-500 focus:bg-white outline-none"
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="pt-2 flex items-center justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold hover:bg-slate-100 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/20 text-sm"
+            >
+              {initialData ? 'Save Changes' : 'Create Job'}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// CLEAN PRINTABLE RECEIPT / TICKET MODAL
+// ============================================
+function TicketModal({ job, onClose }) {
+  const balance = job.totalPrice - job.depositPaid;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+        
+        {/* Top Control Bar */}
+        <div className="bg-slate-100 px-6 py-3 border-b border-slate-200 flex items-center justify-between print:hidden">
+          <span className="text-xs font-bold text-slate-600">Print Preview</span>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handlePrint}
+              className="bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-slate-800"
+            >
+              <PrintIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Print Now</span>
+            </button>
+            <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Ticket Area */}
+        <div className="p-6 font-sans text-slate-900">
+          
+          <div className="text-center pb-4 border-b-2 border-slate-900">
+            <h1 className="font-black text-xl tracking-tight">PRINT SHOP RECEIPT</h1>
+            <p className="text-xs text-slate-500">Order #{job.id}</p>
+          </div>
+
+          <div className="my-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Customer:</span>
+              <span className="font-bold">{job.customerName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Phone:</span>
+              <span className="font-bold">{job.phone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Target Pickup:</span>
+              <span className="font-bold">{new Date(job.dueDate).toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 my-4 text-sm">
+            <span className="text-xs font-bold text-slate-400 uppercase">Item Description</span>
+            <p className="font-extrabold text-slate-900 mt-0.5">{job.jobTitle}</p>
+            {job.notes && <p className="text-xs text-slate-500 italic mt-1">Note: {job.notes}</p>}
+          </div>
+
+          <div className="border-t-2 border-slate-900 pt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>Total Price:</span>
+              <span className="font-bold">${job.totalPrice.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Deposit Paid:</span>
+              <span className="font-bold">${job.depositPaid.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-base font-black pt-2 border-t border-slate-200">
+              <span>BALANCE DUE:</span>
+              <span className={balance > 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                ${balance.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center text-xs text-slate-400 pt-4 border-t border-dashed border-slate-300">
+            Thank you for your business!
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
